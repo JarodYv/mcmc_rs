@@ -151,8 +151,9 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use ndarray::{array, Array2};
-    use ndarray_linalg::Inverse;
+    use super::*;
+
+    use crate::{NK, NY};
 
     #[test]
     fn test_inverse() {
@@ -160,5 +161,14 @@ mod test {
         assert_eq!(a, array![[1., 0.], [0., 1.]]);
         let ia = a.inv().unwrap();
         println!("{:?}", ia);
+    }
+
+    #[test]
+    fn add() {
+        let mut a = Array2::<f64>::zeros((NY, NK));
+        let b = Array2::<f64>::ones((NY, NK));
+        a += &b.mapv(|x| x + 2.);
+        println!("{:?}", b);
+        println!("{:?}", a);
     }
 }
