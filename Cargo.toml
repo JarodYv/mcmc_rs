@@ -7,4 +7,9 @@ edition = "2021"
 
 [dependencies]
 ndarray = "0.15.4"
+
+[target.'cfg(linux)'.dependencies]
 ndarray-linalg = { version = "0.14.1", features = ["openblas-static"] }
+
+# [target.'cfg(not(linux))'.dependencies]
+# ndarray-linalg = { version = "0.14.1", features = ["intel-mkl-static"] }

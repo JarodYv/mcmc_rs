@@ -1,6 +1,6 @@
 use ndarray::prelude::*;
-use ndarray::{Array1, Array2};
-use ndarray_linalg::Inverse;
+use ndarray::{stack, Array1, Array2};
+// use ndarray_linalg::Inverse;
 
 const NO: usize = 800; // 样本量
 const NY: usize = 9; // Indicator数量
@@ -18,6 +18,27 @@ const MCAX: usize = 10000;
 const GNUM: usize = 5000;
 const CNUM: usize = 1;
 const SS: usize = 1;
+
+/// 将BI的值切片分配给BD，PII和PB
+fn rel1(BI: &Array2<f64>, BD: &mut Array2<f64>, PII: &mut Array2<f64>, PB: &mut Array2<f64>) {
+    BD.assign(&BI.slice(s![.., ..ND]));
+    PII.assign(&BI.slice(s![.., ND..ND + NM]));
+    PB.assign(&BI.slice(s![.., ND + NM..]));
+}
+
+fn gxi2(gx2: &mut Array2<f64>, x2: &Array2<f64>) {}
+
+fn rela2(
+    GOmega: &Array2<f64>,
+    BGZ: &Array2<f64>,
+    GEta: &mut Array2<f64>,
+    GXI: &mut Array2<f64>,
+    GFx: &Array2<f64>,
+    GXIB: &mut Array2<f64>,
+) {
+    GEta.assign(&GOmega.slice(s![.., ..NM]));
+    GXI.assign(&GOmega.slice(s![.., NM..NM + NZ]));
+}
 
 fn genBZ(BZ: &mut Array2<f64>) {
     // The equivalent logic to genBZ.c
@@ -117,7 +138,12 @@ fn main() {
         let mut PBI = Array2::<f64>::zeros((NM, NB));
         let mut PSD = array![1.0];
         let mut PHI = Array2::<f64>::eye(NZ);
-        let mut INPH = PHI.inv().unwrap();
+        // let mut INPH = PHI.inv().unwrap();
+
+        let mut BD = Array2::<f64>::zeros((NM, ND));
+        let mut PII = Array2::<f64>::zeros((NM, NM));
+        let mut PB = Array2::<f64>::zeros((NM, NG));
+        rel1(&BI, &mut BD, &mut PII, &mut PB);
 
         let mut EOmega = Array2::<f64>::zeros((NO, NK));
         let mut EPA = Array1::<f64>::zeros(NP);
@@ -136,6 +162,8 @@ fn main() {
         for GIB in 1..=MCAX {
             for i in 0..NO {}
 
+            rel1(&BI, &mut BD, &mut PII, &mut PB);
+
             if GIB % 100 == 0 {
                 println!("{}", GIB);
             }
@@ -146,11 +174,21 @@ fn main() {
                 VPA += &PA.mapv(|a: f64| a.powi(2));
             }
         }
+        let tmp: f64 = (SS / (MCAX - GNUM)) as f64;
+        EOmega.mapv_inplace(|a: f64| a * tmp);
+        EPA.mapv_inplace(|a: f64| a * tmp);
+        VPA.zip_mut_with(&EPA, |a: &mut f64, b: &f64| {
+            *a = ((*a) * tmp - (*b).powi(2)).sqrt()
+        });
+        let AVAC: f64 = Accept_Omega / (MCAX - NO) as f64;
+        println!("Average Acceptance Rate of Omega: {}", AVAC);
     }
 }
 
 #[cfg(test)]
 mod test {
+    use ndarray::AssignElem;
+
     use super::*;
 
     use crate::{NK, NY};
@@ -159,16 +197,53 @@ mod test {
     fn test_inverse() {
         let a = Array2::<f64>::eye(2);
         assert_eq!(a, array![[1., 0.], [0., 1.]]);
-        let ia = a.inv().unwrap();
-        println!("{:?}", ia);
+        // let ia = a.inv().unwrap();
+        // println!("{:?}", ia);
     }
 
     #[test]
-    fn add() {
+    fn test_map() {
         let mut a = Array2::<f64>::zeros((NY, NK));
-        let b = Array2::<f64>::ones((NY, NK));
-        a += &b.mapv(|x| x + 2.);
+        let mut b = Array2::<f64>::ones((NY, NK));
+        a.mapv_inplace(|x| x + 1.);
+        assert_eq!(a, Array2::from_elem((NY, NK), 1.));
+
+        b.map_inplace(|x| *x = (*x).sqrt());
+        assert_eq!(a, Array2::from_elem((NY, NK), 1.));
+
+        a += &b.mapv(|x| x * 2. + 2.);
+        assert_eq!(a, Array2::from_elem((NY, NK), 5.));
+
         println!("{:?}", b);
         println!("{:?}", a);
+
+        a.zip_mut_with(&b, |a: &mut f64, b: &f64| {
+            *a = ((*a) * 2. - (*b).powi(2)).sqrt()
+        });
+        println!("{:?}", a);
+        assert_eq!(a, Array2::from_elem((NY, NK), 3.));
+    }
+
+    #[test]
+    fn test_rel1() {
+        let BI = array![[1., 2., 3., 4., 5., 6.]];
+        let mut BD = Array2::<f64>::zeros((NM, ND));
+        let mut PII = Array2::<f64>::zeros((NM, NM));
+        let mut PB = Array2::<f64>::zeros((NM, NG));
+        rel1(&BI, &mut BD, &mut PII, &mut PB);
+
+        PB.slice_mut(s![.., ..ND]).assign(&BD);
+
+        println!("{}", BD);
+        println!("{}", PII);
+        println!("{}", PB);
+        println!("{}", BI);
+
+        let x = stack![Axis(0), BD, BD];
+        println!("{:?}", x);
+
+        let a: f64 = 10.;
+        let b = a.sqrt();
+        println!("{}", b);
     }
 }
